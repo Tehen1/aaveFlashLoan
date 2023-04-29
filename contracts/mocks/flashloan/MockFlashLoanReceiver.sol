@@ -1,6 +1,7 @@
 pragma solidity ^0.5.0;
 
 import "openzeppelin-solidity/contracts/math/SafeMath.sol";
+
 import "../../flashloan/base/FlashLoanReceiverBase.sol";
 import "../tokens/MintableERC20.sol";
 
@@ -23,7 +24,8 @@ contract MockFlashLoanReceiver is FlashLoanReceiverBase {
     function executeOperation(
         address _reserve,
         uint256 _amount,
-        uint256 _fee) external returns(uint256 returnedAmount) {
+        uint256 _fee,
+        bytes memory _params) public {
         //mint to this contract the specific amount
         MintableERC20 token = MintableERC20(_reserve);
 
@@ -33,21 +35,17 @@ contract MockFlashLoanReceiver is FlashLoanReceiverBase {
 
         if(failExecution) {
             emit ExecutedWithFail(_reserve, _amount, _fee);
-            //returns amount + fee, but does not transfer back funds
-            return _amount.add(_fee);
+            return;
         }
 
         //execution does not fail - mint tokens and return them to the _destination
         //note: if the reserve is eth, the mock contract must receive at least _fee ETH before calling executeOperation
-        INetworkMetadataProvider dataProvider = INetworkMetadataProvider(addressesProvider.getNetworkMetadataProvider());
 
-        if(_reserve != dataProvider.getEthereumAddress()) {
+        if(_reserve != EthAddressLib.ethAddress()) {
             token.mint(_fee);
         }
         //returning amount + fee to the destination
         transferFundsBackToPoolInternal(_reserve, _amount.add(_fee));
         emit ExecutedWithSuccess(_reserve, _amount, _fee);
-        return _amount.add(_fee);
-
     }
 }
